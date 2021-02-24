@@ -1,0 +1,37 @@
+/**
+ * JavaCC template file created by SF JavaCC plugin 1.5.28+ wizard for JavaCC 1.5.0+
+ */options{  static = true;
+  LOOKAHEAD = 1;}PARSER_BEGIN(Parser)
+package calculator;
+// Java code invoking the parser
+public class Parser {
+public static void main(String args[]) throws ParseException {
+// Object instantiation using the constructor with an argument
+// that reads from the standard input (keyboard)
+Parser parser = new Parser(System.in);
+parser.Aritm();
+}
+}
+PARSER_END(Parser)
+// Symbols that must be skipped during the lexical analysis
+SKIP :
+{
+" " | "\t" | "\r"
+}
+// token definition (terminal symbols)
+TOKEN :
+{
+< INTEGER : (["0" - "9"])+ >
+| < LF : "\n" >
+}
+// Production definition
+void Aritm() : {Token t1, t2;}
+{
+t1=<INTEGER> {
+System.out.println("Integer = "+t1.image);
+}
+( ("+" | "-") t2=<INTEGER> {
+System.out.println("Integer = "+t2.image);
+}
+)? (<LF>)
+}
