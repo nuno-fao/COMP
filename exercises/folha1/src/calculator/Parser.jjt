@@ -1,0 +1,44 @@
+options
+{
+LOOKAHEAD=1;
+}
+PARSER_BEGIN(Parser)
+package calculator;
+public class Parser
+{
+public static void main(String args[]) throws ParseException {
+System.out.println("Parser for a calculator that accepts expressions with integers, +,-,*,/,(,and ).");
+System.out.println("Write an arithmetic expression:");
+Parser myCalc = new Parser(System.in);
+SimpleNode root = myCalc.Expression(); // returns reference to root node
+root.dump(""); // prints the tree on the screen
+}
+}
+PARSER_END(Parser)
+SKIP :
+{
+" " | "\r" | "\t"
+}
+TOKEN:
+{
+< INTEGER: (["0"-"9"])+ >
+| < LF: "\n" >
+}
+SimpleNode Expression(): {}
+{
+Expr1() <LF> {return jjtThis;} // Java code inside brackets
+}
+void Expr1(): {}
+{
+Expr2() [("+" | "-") Expr2()]
+}
+void Expr2(): {}
+{
+Expr3() [("*" | "/") Expr3()]
+}
+void Expr3(): {}
+{
+<INTEGER>
+| "-" Expr3()
+| "(" Expr1() ")"
+}
