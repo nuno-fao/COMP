@@ -4,7 +4,7 @@ LOOKAHEAD=2; //needed to decide if line is statement or final
 }
 
 PARSER_BEGIN(Parser)
-package ex1;
+package ex2;
 
 public class Parser
 {
@@ -44,50 +44,49 @@ PARSER_END(Parser)
 
 SKIP :
 {
-" " | "\r" | "\t"
+	" " | "\r" | "\t"
 } 
 TOKEN:
 {
-< INTEGER: (["0"-"9"])+ > 
-| < LF: "\n" >
-| < VAR : ["A"-"Z", "a"-"z"](["0"-"9", "A"-"Z", "a"-"z"])* >
-| < SEMICOL: ";" >
+	< INTEGER: (["0"-"9"])+ > 
+	| < LF: "\n" >
+	| < VAR : ["A"-"Z", "a"-"z"](["0"-"9", "A"-"Z", "a"-"z"])* >
+	| < SEMICOL: ";" >
 }
 
 SimpleNode Expression (): {Token sym, value;}
-{
-( sym =<VAR> "=" value=<INTEGER>{ 
-        SymbolTable.store(sym.image, Integer.parseInt(value.image));
-   } <SEMICOL> <LF>)*
-Expr1() <SEMICOL> <LF> {return jjtThis;}
+{	( sym =<VAR> "=" value=<INTEGER>
+		{
+			SymbolTable.store(sym.image, Integer.parseInt(value.image));
+		} <SEMICOL> <LF>
+	)*
+	Expr1(1) <SEMICOL> <LF> {return jjtThis;}
 }
-void Expr1() #void: {}
+
+void Expr1(int sign) #void: {}
 {
-Expr2(1)
-[
-("+" Expr2(1) #Add(2)
-| "-" Expr2(1) #Sub(2))
-]
+	Expr2(sign)
+	[ ("+" Expr2(sign) #Add(2) | "-" Expr2(sign) #Sub(2)) ]
 }
 void Expr2(int sign) #void: {} // 1: positive; -1: negative
 {
-Expr3(sign)
-("*" Expr3(1) #Mul(2)
-| "/" Expr3(1) #Div(2)
-)? // (…)?equivalent to […]
+	Expr3(sign)
+	[ ("*" Expr3(sign) #Mul(2) | "/" Expr3(sign) #Div(2)) ] // (…)?equivalent to […]
 }
 void Expr3(int sign) #void: {Token t;}
 {
-(
-t=<INTEGER>
-{
-jjtThis.val = sign * Integer.parseInt(t.image);
-}
-|
-t=<VAR>
-{
-jjtThis.val = sign * SymbolTable.get(t.image);} )#Term
-
-| "-" Expr3(-1)
-| "(" Expr1() ")"
+  
+	(
+		t=<INTEGER>
+		{
+			jjtThis.val = sign * Integer.parseInt(t.image);
+		}
+		|
+		t=<VAR>
+		{
+			jjtThis.val = sign * SymbolTable.get(t.image);		} 	)#Term
+	
+	| "-" Expr3(-1)
+	
+	| "(" Expr1(sign) ")"
 }
