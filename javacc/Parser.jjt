@@ -1,0 +1,372 @@
+PARSER_BEGIN(Parser)
+
+import pt.up.fe.comp.jmm.report.Report;
+import pt.up.fe.comp.jmm.report.Stage;
+import pt.up.fe.comp.jmm.report.ReportType;
+
+public class Parser
+{
+    public static int errorLimit = 10;
+    public static int errorCounter = 0;
+}
+
+PARSER_END(Parser)
+
+SKIP:
+{
+    " " | "\n" | "\t" | "\r"
+}
+
+TOKEN:
+{
+//todo check this
+    < INTEGERLITERAL : (["0"-"9"])+ >
+    | < IF : "if">
+    | < INT : "int">
+    | < NEW : "new">
+    | < VOID : "void">
+    | < ELSE : "else">
+    | < TRUE : "true">
+    | < MAIN : "main">
+    | < THIS : "this">
+    | < WHILE : "while">
+    | < FALSE : "false">
+    | < CLASS : "class">
+    | < PUBLIC : "public">
+    | < STATIC : "static">
+    | < STRING : "String"([" "])*"[]">
+    | < LENGTH : "length">
+    | < RETURN : "return">
+    | < IMPORT : "import">
+    | < BOOLEAN : "boolean">
+    | < EXTENDS : "extends">
+    | < OPENPAR : "(">
+    | < CLOSEPAR : ")">
+    | < SEMICOLON : ";">
+    | < OPENCUR : "{">
+    | < IDENTIFIER : (["a"-"z","A"-"Z","_","$"])(["a"-"z","A"-"Z","0"-"9","_","$"])* >
+}
+
+/* COMMENTS - SECTION COPIED FROM SAMPLE JAVA1.1 FILE PROVIDED */
+
+MORE :
+{
+  "//" : IN_SINGLE_LINE_COMMENT
+|
+  <"/**" ~["/"]> { input_stream.backup(1); } : IN_FORMAL_COMMENT
+|
+  "/*" : IN_MULTI_LINE_COMMENT
+}
+
+<IN_SINGLE_LINE_COMMENT>
+SPECIAL_TOKEN :
+{
+  <SINGLE_LINE_COMMENT: "\n" | "\r" | "\r\n" > : DEFAULT
+}
+
+<IN_FORMAL_COMMENT>
+SPECIAL_TOKEN :
+{
+  <FORMAL_COMMENT: "*/" > : DEFAULT
+}
+
+<IN_MULTI_LINE_COMMENT>
+SPECIAL_TOKEN :
+{
+  <MULTI_LINE_COMMENT: "*/" > : DEFAULT
+}
+
+<IN_SINGLE_LINE_COMMENT,IN_FORMAL_COMMENT,IN_MULTI_LINE_COMMENT>
+MORE :
+{
+  < ~[] >
+}
+
+JAVACODE
+void pushErrorNode() #void
+{
+    jjtree.pushNode(new SimpleNode(46));
+}
+
+JAVACODE
+void handleError(ParseException e) #void
+{
+    addReportToMain("Error found in while expression!", ReportType.ERROR);
+    error_skipto("while expression");
+    errorCounter++;
+    pushErrorNode();
+    Main.dumpTree = false;
+    if (errorCounter == errorLimit)
+    {
+        addReportToMain("Error found in while expression!", ReportType.ERROR);
+        //throw new ParseException("Found 10 errors! Will stop parsing!");
+    }
+}
+
+JAVACODE
+void error_skipto(String description) #void {
+    ParseException e = generateParseException();  // generate the exception object
+    Token t;
+
+    t = getToken(1);
+    System.out.println("Unexpected \"" + t.image + "\" in " + description + " at line " + t.beginLine + ", at column " + t.beginColumn + "!");
+
+    while(t.kind != EOF && t.kind != OPENCUR && t.kind != CLOSEPAR)
+    {
+        getNextToken();
+        t = getToken(1);
+    }
+
+    while (t.kind == CLOSEPAR)
+    {
+        getNextToken();
+        t = getToken(1);
+    }
+}
+
+JAVACODE
+void addReportToMain(String message, ReportType reportType) #void
+{
+    Token t = getToken(1);
+    int lineError = t.beginLine;
+    Stage stage = Stage.LEXICAL;
+    Main.reports.add(new Report(reportType, stage, lineError, message));
+}
+
+SimpleNode Program() : {}
+{
+    ImportDeclaration() ClassDeclaration() <EOF> {return jjtThis;}
+}
+
+void ImportDeclaration() : {}
+{
+    (ImportMaterial())*
+}
+
+void ImportMaterial() : {Token t1,t2;}
+{
+    <IMPORT> t1=<IDENTIFIER> ("." t2=<IDENTIFIER> {jjtThis.name += "." + t2.image;})* {jjtThis.name = t1.image + jjtThis.name;} <SEMICOLON>
+}
+
+void ClassDeclaration() : {Token t1,t2;}
+{
+    <CLASS> (t1=<IDENTIFIER> {jjtThis.name = t1.image; jjtThis.line = String.valueOf(t1.beginLine); jjtThis.column = String.valueOf(t1.beginColumn);} #Name) (<EXTENDS> t2=<IDENTIFIER> {jjtThis.name = t2.image; jjtThis.line = String.valueOf(t2.beginLine); jjtThis.column = String.valueOf(t2.beginColumn);} #ExtendedClassName)? <OPENCUR> ( ((VarDeclaration())* #Vars) ((MethodDeclaration())* #Methods)) #Body "}"
+}
+
+void VarDeclaration() : {Token t1,t2;}
+{
+   t2=Type() {jjtThis.type = t2.image; jjtThis.line = String.valueOf(t2.beginLine); jjtThis.column = String.valueOf(t2.beginColumn);} #VarType t1=<IDENTIFIER> {jjtThis.name = t1.image; jjtThis.line = String.valueOf(t1.beginLine); jjtThis.column = String.valueOf(t1.beginColumn);} #VarName <SEMICOLON>
+}
+
+void MethodDeclaration() #void : {}
+{
+    <PUBLIC> (NormalMethodDeclaration() | MainMethodDeclaration())
+}
+
+void NormalMethodDeclaration() : {Token t1,t2;}
+{
+    (t2=Type() {jjtThis.type = t2.image; jjtThis.line = String.valueOf(t2.beginLine); jjtThis.column = String.valueOf(t2.beginColumn);} #ReturnType) t1=<IDENTIFIER> {jjtThis.name = t1.image; jjtThis.line = String.valueOf(t1.beginLine); jjtThis.column = String.valueOf(t1.beginColumn);} #MethodName <OPENPAR> (MethodDeclarationArgs())? <CLOSEPAR> <OPENCUR> MethodBody() <RETURN> Expression() #ReturnValue <SEMICOLON> "}"
+}
+
+void MainMethodDeclaration() : {Token t1;}
+{
+    <STATIC> <VOID> <MAIN> <OPENPAR> <STRING> t1=<IDENTIFIER> {jjtThis.name = t1.image; jjtThis.line = String.valueOf(t1.beginLine); jjtThis.column = String.valueOf(t1.beginColumn);} #ArgName <CLOSEPAR> <OPENCUR> MethodBody() "}"
+}
+
+void MethodBody() #Body : {}{
+    (LOOKAHEAD(2) VarDeclaration())* (Statement())*
+}
+
+void MethodDeclarationArgs() #Args: {Token t1,t2,t3,t4;}
+{
+    ((t3=Type() {jjtThis.type = t3.image; jjtThis.line = String.valueOf(t3.beginLine); jjtThis.column = String.valueOf(t3.beginColumn);} #ParameterType) (t1=<IDENTIFIER> {jjtThis.name = t1.image; jjtThis.line = String.valueOf(t1.beginLine); jjtThis.column = String.valueOf(t1.beginColumn);} #ParameterName) #Parameter(2)) ("," ((t4=Type() {jjtThis.type = t4.image; jjtThis.line = String.valueOf(t4.beginLine); jjtThis.column = String.valueOf(t4.beginColumn);} #ParameterType) (t2=<IDENTIFIER> {jjtThis.name = t2.image; jjtThis.line = String.valueOf(t2.beginLine); jjtThis.column = String.valueOf(t2.beginColumn);} #ParameterName)) #Parameter(2))*
+}
+
+Token Type() #void : {Token t1,t2,t3;}
+{
+    t1=<INT> ("[" "]" {t1.image += "[]";})? {return t1;}
+    | t2=<BOOLEAN> {return t2;}
+    | t3=<IDENTIFIER> {return t3;}
+}
+
+void Body() : {}
+{
+    Statement()
+}
+
+void ArrayInitializer() : {}
+{
+    <INT> "[" Expression() "]"
+}
+
+void ConstructorCall() : {Token t1;}
+{
+    t1=<IDENTIFIER> {jjtThis.name = t1.image; jjtThis.line = String.valueOf(t1.beginLine); jjtThis.column = String.valueOf(t1.beginColumn);} #ObjectClassName <OPENPAR> <CLOSEPAR>
+}
+
+
+void MethodCall() #void : {Token t1;}
+{
+    t1=<IDENTIFIER> {jjtThis.name = t1.image; jjtThis.line = String.valueOf(t1.beginLine); jjtThis.column = String.valueOf(t1.beginColumn);} #MethodName <OPENPAR> MethodCallArgs() <CLOSEPAR> #Method(3)
+}
+
+void AttributeCall() #void : {}
+{
+    <LENGTH> #AttributeCall(1)
+}
+
+void MethodCallArgs() #Args : {}
+{
+    (Expression() ( "," Expression())*)?
+}
+
+
+
+void Statement() #void: {Token t1;}
+{
+    <OPENCUR> (Statement() )* "}"
+    | <IF> <OPENPAR> Expression() <CLOSEPAR> Body()  #If(2) <ELSE> Statement() #Else
+    | <WHILE> <OPENPAR>
+   try
+   {
+        Expression() <CLOSEPAR>
+   }
+   catch (ParseException e)
+   {
+        handleError(e);
+   }  Body()  #While(2)
+   | Expression1() ";"
+   | id()
+   }
+void id() #void: {Token t1;}
+{
+    t1=<IDENTIFIER> ({jjtThis.name = t1.image; jjtThis.line = String.valueOf(t1.beginLine); jjtThis.column = String.valueOf(t1.beginColumn);} #Assigned "=" Expression() #Assign(2) /*todo check | Expression()*/ | ({jjtThis.name = t1.image; jjtThis.line = String.valueOf(t1.beginLine); jjtThis.column = String.valueOf(t1.beginColumn);} #VariableName) (("[" Expression()"]") #ArrayIndex) #ArrayAccess(2)  ( "=" (Expression()) #Assign(2))? | {jjtThis.name = t1.image; jjtThis.line = String.valueOf(t1.beginLine); jjtThis.column = String.valueOf(t1.beginColumn);} #Object "." (  MethodCall() | AttributeCall()))? ";"
+}
+
+void Expression() #void : {Token t1,t2;}
+{
+
+    LESSN()
+               (
+                   "&&" LESSN() #AND(2)
+               )*
+}
+
+void Expression1() #void : {}
+{
+
+    LESSE()
+         (
+             "&&" LESSN() #AND(2)
+         )*
+}
+
+void LESSN() #void : {}{
+    SUMSN()
+        (
+             "<" SUMSN() #LessThan(2)
+        )*
+}
+
+void LESSE() #void : {}{
+    SUMSE()
+        (
+            "<" SUMSN() #LessThan(2)
+        )*
+}
+
+void SUMSN() #void : {}{
+    MULSN()
+        (
+              "+" MULSN() #Add(2)
+              | "-" MULSN() #Sub(2)
+        )*
+}
+
+void SUMSE() #void : {}{
+    MULSE()
+        (
+              "+" MULSN() #Add(2)
+              | "-" MULSN() #Sub(2)
+        )*
+}
+
+
+
+
+void MULSE() #void : {}
+{
+    Expr4()
+    (
+        "*" Expr5() #Mul(2)
+        | "/" Expr5() #Div(2)
+    )*
+}
+
+void MULSN() #void : {}
+{
+    Expr5()
+    (
+        "*" Expr5() #Mul(2)
+        | "/" Expr5() #Div(2)
+    )*
+}
+
+
+void Expr4() #void : {}
+{
+    P1()
+    (
+        C()
+    )*
+    |
+    ("!" P()
+        (
+            C()
+        )*) #Neg
+}
+
+void Expr5() #void : {}
+{
+    P()
+    (
+        C()
+    )*
+    |
+    ("!" P()
+        (
+            C()
+        )*) #Neg
+}
+
+void C() #void : {}
+{
+    (("[" Expression()"]") #ArrayIndex) #ArrayAccess(2)
+    | "." ( MethodCall() | AttributeCall())
+}
+
+void P() #void : {Token t1,t2;}
+{
+    t1=<INTEGERLITERAL> {jjtThis.name = t1.image; jjtThis.line = String.valueOf(t1.beginLine); jjtThis.column = String.valueOf(t1.beginColumn);} #IntegerLiteral
+    | <TRUE> #True
+    | <FALSE> #False
+    | t1=<IDENTIFIER> {jjtThis.name = t1.image; jjtThis.line = String.valueOf(t1.beginLine); jjtThis.column = String.valueOf(t1.beginColumn);} #VariableName
+    | <THIS> #This
+    | <NEW> (ArrayInitializer() | ConstructorCall())
+    | <OPENPAR> Expression() <CLOSEPAR>
+}
+
+void P1() #void : {Token t1,t2;}
+{
+    t1=<INTEGERLITERAL> {jjtThis.name = t1.image; jjtThis.line = String.valueOf(t1.beginLine); jjtThis.column = String.valueOf(t1.beginColumn);} #IntegerLiteral
+    | <TRUE> #True
+    | <FALSE> #False
+    | <THIS> #This
+    | <NEW> (ArrayInitializer() | ConstructorCall())
+    | <OPENPAR> Expression() <CLOSEPAR>
+}
+
+
+
+
+

@@ -1,0 +1,10 @@
+/*  REASON:
+    Array sizes must be integer.
+*/
+
+class T {
+    public static void main(String[] a) { 
+        int[] b;
+        b = new int[true];
+    }
+}
